@@ -123,3 +123,76 @@ class AboutController extends Controller
         echo json_encode(array("status" => 1));
     }
 }
+public function verifyOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required|integer',
+        ]);
+
+        $otpRecord = Otp::where('email', $request->email)
+                        ->where('otp', $request->otp)
+                        ->where('expires_at', '>', Carbon::now())
+                        ->first();
+
+        if ($otpRecord) {
+            return response()->json(['message' => 'OTP verified successfully.']);
+        }
+
+        return response()->json(['message' => 'Invalid or expired OTP.'], 400);
+    }
+
+    @extends('layouts.app')
+
+@section('title', 'OTP Verification')
+
+@section('content')
+    <form id="verifyForm">
+        <input type="email" name="email" placeholder="Enter your email" required>
+        <div id="verifyEmailError" class="error-message"></div>
+        <input type="number" name="otp" placeholder="Enter OTP" required>
+        <div id="otpError" class="error-message"></div>
+        <button type="button" id="verifyOtpBtn">Verify OTP</button>
+    </form>
+@endsection
+
+@section('scripts')
+    <script>
+        // Set the CSRF token directly in JavaScript
+        var csrfToken = '{{ csrf_token() }}';
+
+        $(document).ready(function() {
+            function clearErrors() {
+                $('#verifyEmailError').text('');
+                $('#otpError').text('');
+            }
+
+            $('#verifyOtpBtn').click(function() {
+                clearErrors();
+                $.ajax({
+                    url: '/verify-otp',
+                    method: 'POST',
+                    data: $('#verifyForm').serialize(), // Serialize the form data
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken // Set the CSRF token here
+                    },
+                    success: function(response) {
+                        location.reload(); // Refresh the page on success
+                    },
+                    error: function(response) {
+                        if (response.responseJSON.errors) {
+                            if (response.responseJSON.errors.email) {
+                                $('#verifyEmailError').text(response.responseJSON.errors.email[0]);
+                            }
+                            if (response.responseJSON.errors.otp) {
+                                $('#otpError').text(response.responseJSON.errors.otp[0]);
+                            }
+                        } else {
+                            $('#otpError').text(response.responseJSON.message);
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+@endsection
